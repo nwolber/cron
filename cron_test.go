@@ -109,6 +109,48 @@ func TestAddWhileRunning(t *testing.T) {
 	}
 }
 
+func TestRemoveWhileRunning(t *testing.T) {
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
+
+	cron := New()
+	once := sync.Once{}
+	cron.AddFunc("* * * * * ?", func() { once.Do(func() { wg.Done() }) })
+	id, _ := cron.AddFunc("* * * * * ?", func() { t.Error("expected job to be removed") })
+	otherOnce := sync.Once{}
+	cron.AddFunc("* * * * * ?", func() { otherOnce.Do(func() { wg.Done() }) })
+	entries := cron.Entries()
+
+	var oldEntry *Entry
+	for _, entry := range entries {
+		if entry.ID == id {
+			oldEntry = entry
+			break
+		}
+	}
+
+	cron.Start()
+	cron.Remove(oldEntry)
+	defer cron.Stop()
+
+	select {
+	case <-time.After(ONE_SECOND):
+		t.FailNow()
+	case <-wait(wg):
+	}
+}
+
+func TestRemoveBeforeRunning(t *testing.T) {
+	cron := New()
+	cron.AddFunc("* * * * * ?", func() { t.Error("expected job to be removed") })
+	entries := cron.Entries()
+	cron.Remove(entries[0])
+	cron.Start()
+	defer cron.Stop()
+
+	<-time.After(ONE_SECOND)
+}
+
 // Test for #34. Adding a job after calling start results in multiple job invocations
 func TestAddWhileRunningWithDelay(t *testing.T) {
 	cron := New()
@@ -116,9 +158,9 @@ func TestAddWhileRunningWithDelay(t *testing.T) {
 	defer cron.Stop()
 	time.Sleep(5 * time.Second)
 	var calls = 0
-	cron.AddFunc("* * * * * *", func() { calls += 1 });
+	cron.AddFunc("* * * * * *", func() { calls += 1 })
 
-	<- time.After(ONE_SECOND)
+	<-time.After(ONE_SECOND)
 	if calls != 1 {
 		fmt.Printf("called %d times, expected 1\n", calls)
 		t.Fail()
