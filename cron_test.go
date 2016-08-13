@@ -119,18 +119,9 @@ func TestRemoveWhileRunning(t *testing.T) {
 	id, _ := cron.AddFunc("* * * * * ?", func() { t.Error("expected job to be removed") })
 	otherOnce := sync.Once{}
 	cron.AddFunc("* * * * * ?", func() { otherOnce.Do(func() { wg.Done() }) })
-	entries := cron.Entries()
-
-	var oldEntry *Entry
-	for _, entry := range entries {
-		if entry.ID == id {
-			oldEntry = entry
-			break
-		}
-	}
 
 	cron.Start()
-	cron.Remove(oldEntry)
+	cron.Remove(id)
 	defer cron.Stop()
 
 	select {
@@ -142,9 +133,8 @@ func TestRemoveWhileRunning(t *testing.T) {
 
 func TestRemoveBeforeRunning(t *testing.T) {
 	cron := New()
-	cron.AddFunc("* * * * * ?", func() { t.Error("expected job to be removed") })
-	entries := cron.Entries()
-	cron.Remove(entries[0])
+	id, _ := cron.AddFunc("* * * * * ?", func() { t.Error("expected job to be removed") })
+	cron.Remove(id)
 	cron.Start()
 	defer cron.Stop()
 

@@ -141,7 +141,15 @@ func (c *Cron) Entries() []*Entry {
 	return c.entrySnapshot()
 }
 
-func (c *Cron) Remove(entry *Entry) {
+func (c *Cron) Remove(entryID string) {
+	var entry *Entry
+	for _, e := range c.Entries() {
+		if e.ID == entryID {
+			entry = e
+			break
+		}
+	}
+
 	if !c.running {
 		c.rm(entry)
 		return
